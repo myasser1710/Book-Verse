@@ -26,8 +26,9 @@ export const getAllLogs = async (req, res) => {
 
 export const getLogById = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!ObjectId.isValid(id)) {
+    const { id } = req.params
+
+    if (!ObjectId.isValid(id)||!id) {
       return sendError(res, 400, "invalid log id");
     }
     const log = await service.findLogById(id);

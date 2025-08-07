@@ -98,11 +98,10 @@ export const createBooks = async (req, res) => {
       });
     }
 
-    const { insertedBooks, skippedBooks } = await bookServices.insertBooks(
-      validBooks
-    );
+    const { result, insertedBooks, skippedBooks } =
+      await bookServices.insertBooks(validBooks);
 
-    if (insertedBooks && insertedBooks.length > 0) {
+    if (insertedBooks && result.insertedCount > 0) {
       for (const book of insertedBooks) {
         await logService.insertLog({
           action: "create",
@@ -114,8 +113,8 @@ export const createBooks = async (req, res) => {
     }
 
     const responseData = {
-      insertedCount: insertedBooks.length,
-      insertedBooks,
+      insertedCount: result.insertedCount,
+      insertedIds: result.insertedIds,
       skippedDueToInvalidAuthors: skippedBooks,
       validationErrors,
     };
@@ -148,16 +147,11 @@ export const getAllBooks = async (req, res) => {
       return sendError(res, 400, "limit must be a positive integer (max 100)");
     }
 
-    const allowedSortFields = ["createdAt", "year", "title"];
-    const isDescending = sortParam.startsWith("-");
-    const sortField = isDescending ? sortParam.substring(1) : sortParam;
-
-    if (!allowedSortFields.includes(sortField)) {
-      return sendError(res, 400, "invalid sort field");
+    if (sortParam.startsWith("-")) {
+      sort[sortParam.substring(1)] = -1;
+    } else {
+      sort[sortParam] = 1;
     }
-
-    sort[sortField] = isDescending ? -1 : 1;
-    
     const result = await bookServices.findAllBooks({ skip, limit, sort });
 
     if (!result) throw new Error("problem while retriving books");
@@ -192,9 +186,7 @@ export const getBookAuthor = async (req, res) => {
     if (!id || !ObjectId.isValid(id))
       return sendError(res, 400, "valid book id required");
 
-    const result = await bookServices
-      .findBookAuthor(new ObjectId(id))
-      .toArray();
+    const result = await bookServices.findBookAuthor(new ObjectId(id));
 
     if (!result.length) return sendError(res, 404, "book or author not found");
 
@@ -211,16 +203,21 @@ export const updateBook = async (req, res) => {
     if (!id || !ObjectId.isValid(id))
       return sendError(res, 400, "valid book id required");
 
-    const { __proto__, constructor, ...safeUpdates } = req.body;
+    const  updateData  = req.body;
 
-    if (Object.keys(safeUpdates).length === 0)
+    if (Object.keys(updateData).length === 0)
       return sendError(res, 400, "no data provided for update");
 
-    safeUpdates.updatedAt = new Date();
+    if (updateData.authorId && !ObjectId.isValid(updateData.authorId )) {
+      return sendError(res, 400, "valid author id required");
+    }
 
-    const result = await bookServices.updateBook(new ObjectId(id), safeUpdates);
+    updateData.updatedAt = new Date();
 
-    if (!result.matchedCount) return sendError(res, 404, "book not found");
+    const result = await bookServices.updateBook(new ObjectId(id), updateData);
+
+    if (!result.matchedCount)
+      return sendError(res, 404, "book id doesnt exist");
 
     // Log the update action
     await logService.insertLog({
@@ -230,8 +227,9 @@ export const updateBook = async (req, res) => {
       timestamp: new Date(),
     });
 
-    return sendSuccess(res, 200, "book updated successfully");
+    return sendSuccess(res, 200, "book updated successfully",result);
   } catch (error) {
+    console.log(error);
     return sendError(res, 500, "failed to update book", error);
   }
 };
@@ -242,7 +240,10 @@ export const removeBook = async (req, res) => {
 
     if (!id || !ObjectId.isValid(id))
       return sendError(res, 400, "valid book id require for deleting");
-    const result = await bookServices.hardDeleteBook(id);
+
+    const result = await bookServices.hardDeleteBook(new ObjectId(id));
+
+    console.log(result);
 
     if (!result.deletedCount) return sendError(res, 404, "book id not found");
 
