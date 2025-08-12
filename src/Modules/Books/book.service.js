@@ -45,8 +45,8 @@ export const createBookServices = (db) => {
     },
 
     insertBooks: async (bookList) => {
-      //not working well
-      const authorIds = [...new Set(bookList.map((book) => book.authorId))]; //bytala3 el authorids bas mn el booklist
+
+      const authorIds = [...new Set(bookList.map((book) => book.authorId))]; 
 
       const existingAuthors = await db
         .collection("authors")

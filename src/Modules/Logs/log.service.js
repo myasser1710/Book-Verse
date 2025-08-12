@@ -8,8 +8,12 @@ export const createLogServices = db => {
       return dbLog.insertOne(logData)
     },
 
-    findAllLogs: async () => {
-      return dbLog.find().toArray()
+    findAllLogs: async ({ skip = 0, limit = 10, sort = { timestamp: -1 } } = {}) => {
+      return dbLog.find().sort(sort).skip(skip).limit(limit).toArray()
+    },
+
+    countLogs: async () => {
+      return dbLog.countDocuments()
     },
 
     findLogById: async id => {

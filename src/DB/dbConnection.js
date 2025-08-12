@@ -39,6 +39,4 @@ export function getDB() {
   return database
 }
 
-// export const getCollection = (name) => {
-//   return getDB().collection(name);
-// }
+

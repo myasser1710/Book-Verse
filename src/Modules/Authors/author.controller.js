@@ -1,15 +1,10 @@
 import { ObjectId } from "mongodb";
-import { dbPromise } from "../../DB/dbConnection.js";
 import { sendError, sendSuccess } from "../../Utils/responseHandler.utils.js";
-import { createLogServices } from "../Logs/log.service.js";
-import { createAuthorServices } from "./author.service.js";
-
-const authorServices = createAuthorServices(await dbPromise);
-const logServices = createLogServices(await dbPromise);
+import { authorServices, logServices } from "../../DB/services.connection.js";
 
 export const insertAuthor = async (req, res) => {
   try {
-    const { name, bio, ...extraFields } = req.body;
+    const { name, bio } = req.body;
 
     if (!name || Object.keys(req.body).length > 5 || typeof name !== 'string') {
       return sendError(res, 400, "required fields missing or too many fields");
@@ -21,8 +16,7 @@ export const insertAuthor = async (req, res) => {
 
     const authorData = {
       name,
-      bio: bio || "",
-      ...(Object.keys(extraFields).length ? extraFields : {}),
+      bio: bio 
     };
 
     const result = await authorServices.insertAuthor(authorData);
@@ -121,19 +115,31 @@ export const updateAuthor = async (req, res) => {
     if (Object.keys(updateData).length === 0) {
       return sendError(res, 400, "no fields to update");
     }
-    if (updateData.name && typeof updateData.name !== 'string') {
+
+    const allowed = new Set(["name", "bio", "age"]);
+    const filtered = {};
+    for (const [key, value] of Object.entries(updateData)) {
+      if (!allowed.has(key)) continue;
+      filtered[key] = value;
+    }
+
+    if (Object.keys(filtered).length === 0) {
+      return sendError(res, 400, "no valid fields to update");
+    }
+
+    if (filtered.name !== undefined && typeof filtered.name !== 'string') {
       return sendError(res, 400, "name must be a string");
     }
-    if (updateData.bio && typeof updateData.bio !== 'string') {
+    if (filtered.bio !== undefined && typeof filtered.bio !== 'string') {
       return sendError(res, 400, "bio must be a string");
     }
-    if (updateData.age && (typeof updateData.age !== 'number' || updateData.age < 0)) {
-      return sendError(res, 400, "age must be a non-negative number");
+    if (filtered.age !== undefined) {
+      if (typeof filtered.age !== 'number' || filtered.age < 0) {
+        return sendError(res, 400, "age must be a non-negative number");
+      }
     }
-    
 
-
-    const result = await authorServices.updateAuthor(id, updateData);
+    const result = await authorServices.updateAuthor(id, filtered);
 
     if (result.modifiedCount === 0) {
       return sendError(res, 404, "author not found or no changes made");

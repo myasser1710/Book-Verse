@@ -1,18 +1,13 @@
 import { ObjectId } from "mongodb";
-import { dbPromise } from "../../DB/dbConnection.js";
 import { sendError, sendSuccess } from "../../Utils/responseHandler.utils.js";
-import { createLogServices } from "../Logs/log.service.js";
-import { createBookServices } from "./book.service.js";
+import { bookServices, logServices } from "../../DB/services.connection.js";
 
-const bookServices = createBookServices(await dbPromise);
-const logService = createLogServices(await dbPromise);
 
 const MAX_FIELD_COUNT = 15;
 
 export const createBook = async (req, res) => {
   try {
-    const { title, authorId, year, summary, genre, ...extraFields } = req.body;
-    const { __proto__, constructor, ...safeFields } = extraFields;
+    const { title, authorId, year, summary, genre } = req.body;
 
     if (!title || !authorId || Object.keys(req.body).length > MAX_FIELD_COUNT) {
       return sendError(res, 400, "all required fields are needed");
@@ -28,8 +23,7 @@ export const createBook = async (req, res) => {
       updatedAt: new Date(),
       ...(summary && { summary }),
       ...(year && { year: Number(year) }),
-      ...(genre && { genre }),
-      ...safeFields,
+      ...(genre && { genre })
     };
 
     const result = await bookServices.insertBook(bookData);
@@ -37,7 +31,7 @@ export const createBook = async (req, res) => {
     if (result == null) return sendError(res, 400, "author id doesnt exist");
 
     if (result.insertedId) {
-      await logService.insertLog({
+      await logServices.insertLog({
         action: "create",
         entityType: "book",
         entityId: result.insertedId,
@@ -64,8 +58,7 @@ export const createBooks = async (req, res) => {
     const validationErrors = [];
 
     for (const book of books) {
-      const { title, authorId, year, summary, genre, ...extraFields } = book;
-      const { __proto__, constructor, ...safeFields } = extraFields;
+      const { title, authorId, year, summary, genre } = book;
 
       if (
         !title ||
@@ -87,8 +80,7 @@ export const createBooks = async (req, res) => {
         updatedAt: currentTime,
         ...(summary && { summary }),
         ...(year && { year: Number(year) }),
-        ...(genre && { genre }),
-        ...safeFields,
+        ...(genre && { genre })
       });
     }
 
@@ -103,7 +95,7 @@ export const createBooks = async (req, res) => {
 
     if (insertedBooks && result.insertedCount > 0) {
       for (const book of insertedBooks) {
-        await logService.insertLog({
+        await logServices.insertLog({
           action: "create",
           entityType: "book",
           entityId: book._id,
@@ -147,16 +139,27 @@ export const getAllBooks = async (req, res) => {
       return sendError(res, 400, "limit must be a positive integer (max 100)");
     }
 
-    if (sortParam.startsWith("-")) {
-      sort[sortParam.substring(1)] = -1;
-    } else {
-      sort[sortParam] = 1;
+    // enforce sort allowlist
+    const allowedSortFields = ["createdAt", "title", "year"]; 
+    const isDescending = sortParam.startsWith("-");
+    const sortField = isDescending ? sortParam.substring(1) : sortParam;
+
+    if (!allowedSortFields.includes(sortField)) {
+      return sendError(res, 400, "invalid sort field");
     }
-    const result = await bookServices.findAllBooks({ skip, limit, sort });
 
-    if (!result) throw new Error("problem while retriving books");
+    sort[sortField] = isDescending ? -1 : 1;
 
-    return sendSuccess(res, 200, "books retrieved successfully", result);
+    const data = await bookServices.findAllBooks({ skip, limit, sort });
+    const total = await bookServices.countBooks();
+
+    return sendSuccess(res, 200, "books retrieved successfully", {
+      items: data,
+      page: Math.floor(skip / limit) + 1,
+      pageSize: limit,
+      total,
+      hasNext: skip + data.length < total,
+    });
   } catch (error) {
     return sendError(res, 500, "failed to get all books", error);
   }
@@ -203,24 +206,47 @@ export const updateBook = async (req, res) => {
     if (!id || !ObjectId.isValid(id))
       return sendError(res, 400, "valid book id required");
 
-    const  updateData  = req.body;
+    const updateData = req.body || {};
 
     if (Object.keys(updateData).length === 0)
       return sendError(res, 400, "no data provided for update");
 
-    if (updateData.authorId && !ObjectId.isValid(updateData.authorId )) {
-      return sendError(res, 400, "valid author id required");
+    // allowlist of updatable fields
+    const allowed = new Set(["title", "summary", "year", "genre", "authorId"]);
+    const filtered = {};
+    for (const [key, value] of Object.entries(updateData)) {
+      if (!allowed.has(key)) continue;
+      filtered[key] = value;
     }
 
-    updateData.updatedAt = new Date();
+    if (Object.keys(filtered).length === 0) {
+      return sendError(res, 400, "no valid fields to update");
+    }
 
-    const result = await bookServices.updateBook(new ObjectId(id), updateData);
+    // validate and coerce types for allowed fields
+    if (filtered.authorId) {
+      if (!ObjectId.isValid(filtered.authorId)) {
+        return sendError(res, 400, "valid author id required");
+      }
+      filtered.authorId = new ObjectId(filtered.authorId);
+    }
+    if (filtered.year !== undefined) {
+      const n = Number(filtered.year);
+      if (Number.isNaN(n)) {
+        return sendError(res, 400, "year must be a number");
+      }
+      filtered.year = n;
+    }
+
+    filtered.updatedAt = new Date();
+
+    const result = await bookServices.updateBook(new ObjectId(id), filtered);
 
     if (!result.matchedCount)
       return sendError(res, 404, "book id doesnt exist");
 
     // Log the update action
-    await logService.insertLog({
+    await logServices.insertLog({
       action: "update",
       entityType: "book",
       entityId: new ObjectId(id),
@@ -243,15 +269,13 @@ export const removeBook = async (req, res) => {
 
     const result = await bookServices.hardDeleteBook(new ObjectId(id));
 
-    console.log(result);
-
     if (!result.deletedCount) return sendError(res, 404, "book id not found");
 
     if (!result.acknowledged)
-      throw new Error({ message: "error while fetching method" });
+      throw new Error("error while deleting book");
 
     // Log the delete action
-    await logService.insertLog({
+    await logServices.insertLog({
       action: "delete",
       entityType: "book",
       entityId: new ObjectId(id),

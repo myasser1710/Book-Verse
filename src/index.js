@@ -6,10 +6,10 @@ import { connectDB } from './DB/dbConnection.js'
 import { initAuthorCollection } from './DB/Models/author.model.js'
 import { initBookCollection } from './DB/Models/book.model.js'
 import { initLogCollection } from './DB/Models/log.model.js'
-
 import authorRoutes from './Modules/Authors/author.routes.js'
 import bookRoutes from './Modules/Books/book.routes.js'
 import logRoutes from './Modules/Logs/log.routes.js'
+
 
 const app = express()
 app.use(express.json())
@@ -26,6 +26,8 @@ await connectDB()
 await initBookCollection()
 await initAuthorCollection()
 await initLogCollection()
+
+import { authorServices, bookServices, logServices } from './DB/services.connection.js'
 
 
 app.use(limiter)
@@ -50,5 +52,3 @@ app.listen(process.env.PORT, () => {
   console.log(`Server running on http://localhost:${process.env.PORT}`)
 })
 
-// factory pattern summarization for readme
-// https://chatgpt.com/s/t_688e6f5fd9e08191ab9b54cc631dcc5f
