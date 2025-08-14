@@ -85,30 +85,6 @@ BookVerse API
 - MongoDB (v6+)
 - npm or yarn
 
-### Installation
-
-```bash
-# Clone the repository
-git clone <your-repository-url>
-cd bookverse
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your configurations
-
-# Start the development server
-npm run dev
-```
-
-### Docker Setup (Optional)
-
-```bash
-# Using Docker Compose
-docker-compose up -d
-```
 
 ## ⚙️ Environment Setup
 
@@ -349,24 +325,6 @@ npm run dev
 npm install
 ```
 
-### Code Style
-
-The project uses Prettier for code formatting:
-
-```javascript
-// .prettierrc.js configuration
-{
-  semi: false,
-  singleQuote: true,
-  tabWidth: 2,
-  trailingComma: 'none',
-  bracketSpacing: true,
-  arrowParens: 'avoid',
-  printWidth: 80,
-  endOfLine: 'lf'
-}
-```
-
 ### Development Guidelines
 
 1. **ES6+ Modules**: Use import/export syntax
@@ -484,26 +442,6 @@ GET /api/logs?entityType=book&entityId=64a7b8c9d1e2f3a4b5c6d7e8
 - **Capped Collections**: Efficient logging with automatic cleanup
 - **Aggregation**: Complex queries using MongoDB aggregation framework
 
-## 🤝 Contributing
-
-### Development Workflow
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes**: Follow existing code patterns
-4. **Test thoroughly**: Ensure all endpoints work correctly
-5. **Commit your changes**: `git commit -m 'Add amazing feature'`
-6. **Push to branch**: `git push origin feature/amazing-feature`
-7. **Open a Pull Request**: Describe your changes clearly
-
-### Code Standards
-
-- Follow existing architectural patterns
-- Maintain consistent error handling
-- Update documentation for new features
-- Ensure backward compatibility
-- Add appropriate logging for new operations
-
 ### Testing Checklist
 
 - [ ] All CRUD operations work correctly
@@ -532,10 +470,6 @@ GET /api/logs?entityType=book&entityId=64a7b8c9d1e2f3a4b5c6d7e8
 - Review error messages for specific guidance
 - Ensure all environment variables are properly configured
 - Verify MongoDB instance is running and accessible
-
-## 📄 License
-
-This project is licensed under the ISC License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
